@@ -1,0 +1,7 @@
+<cabinet>
+   <shelf id="only">
+      <bottle type="Scotch whisky" aged="8">Glenfiddich</bottle>
+      <bottle type="Scotch whisky" aged="10" />
+      <glass type="tumbler">clean</glass>
+   </shelf>
+</cabinet>

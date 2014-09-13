@@ -1,0 +1,52 @@
+Specification
+-------------
+"The goal is to write a primitive XML parser using only the standard
+glibc library.
+
+The program should:
+* read in an xml file, 
+* parse it into a data structure of your choosing, and
+* print it to the screen.
+
+If an error (such as a mis-matching close tag) is detected, the
+program should:
+* display an error,
+* print the xml read in so far, and
+* terminate
+
+For the purposes of this assignment, there is no need to create a
+validating parser, so you don't have to worry about DTDs or Schemas.
+
+Additionally, the presence of processing instructions (ie. anything
+between '<?' and '?>') and comments (ie. anything between '<!--' and
+'-->') should be tolerated but their contents can be ignored."
+
+With that description having quite a bit of leeway, this project defines a
+subset of XML called Rudimentary Markup (RuM), a library for defining and
+parsing arbitary languages conforming to RuM, a sample language,
+and an application to display files written in the sample language.
+
+
+Rudimentary Markup
+------------------
+Rudimentary Markup (RuM) is a subset of XML:
+* Processing instructions (<?...?>) and comments (<!--...-->) are
+  accepted by ignored;
+* <![CDATA[...]]> is not supported;
+* Non-ASCII characters are not supported;
+* Numeric character entities (&#DECIMAL; or &#xHEX;) are not supported;
+* Each tag type may only be contained within a single parent tag type
+  (i.e., the tag hierarchy is a tree);
+* Each tag may logically contain child tags and/or plain content, but not
+  tagged content, for example:
+     <p>one two</p> <!-- parsed as plain content -->
+     <p> <b>one</b> <i>two</i> </p> <!-- parsed as independent child tags -->
+     <p>one <b>two</b> </p> <!-- parsed as plain content "one" plus independent child tag -->
+* Other minor limitations not worth detailing.
+
+
+Project Components
+------------------
+* rump.c and rump.h: the RuM language definition and parsing library
+* rum.c: an application that displays files in a sample RuM language
+* samples/: sample RuM files, well-formed and not
