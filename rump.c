@@ -8,112 +8,394 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-#include "rump.h"
+#include <string.h>
+#include <rump.h>
+#include "rump_private.h"
 
-/*
-    language definition functions
-
-    A more sophisticated library would define the language via DTD or some
-    such, but rump uses a function (rum_tag_insert()) to build the language
-    description tag by tag.
-
-    A more sophisticated library would also have better error handling and
-    reporting.  Most rump functions simply return NULL on error with no
-    explanation.
-*/
-
-rum_tag_t *
-rum_tag_insert(rum_tag_t *parent, const char *name, int is_empty, rum_attr_t *attrs)
+static char
+entity2char(char *entity)
 {
-    rum_tag_t *tag;
+    if (entity == NULL) {
+        return 0;
+    } else if (!strcmp(entity, "&lt;")) {
+        return '<';
+    } else if (!strcmp(entity, "&gt;")) {
+        return '>';
+    } else if (!strcmp(entity, "&amp;")) {
+        return '&';
+    } else if (!strcmp(entity, "&apos;")) {
+        return '\'';
+    } else if (!strcmp(entity, "&quot;")) {
+        return '\"';
+    }
+    return 0;
+}
 
-    /* can't add a child tag to an empty tag */
-    if (parent && parent->is_empty) {
+static char*
+copy_substring(const char *s, size_t start, size_t end)
+{
+    char *str;
+    size_t len = end - start + 1;
+
+    if ((str = malloc(len + 1)) != NULL) {
+        strncpy(str, s + start, len);
+        str[len] = 0;
+    }
+    return(str);
+}
+
+static rum_parser_t *
+new_parser(const rum_tag_t *language)
+{
+    rum_parser_t *parser;
+
+    if ((language == NULL) || ((parser = malloc(sizeof(rum_parser_t))) == NULL)) {
+        return NULL;
+    }
+    if ((parser->buf = malloc(CHUNKSIZE)) == NULL) {
+        free(parser);
         return NULL;
     }
 
-    /* create a tag instance
-     * (in the interest of brevity, no special memory management is done,
-     * just a bunch of small mallocs) */
-    if ((tag = malloc(sizeof(rum_tag_t))) == NULL) {
-        return NULL;
-    }
-    tag->name = name;
-    tag->parent = parent;
-    tag->is_empty = is_empty;
-
-    /* for simplicity, the attrs argument is required to point to static
-     * memory; a fuller implementation would malloc a copy here */
-    tag->attrs = attrs;
-
-    /* a fuller implementation could do further validation here,
-     * such as ensuring that a tag by this name is not already defined */
-
-    /* add this tag to the tree */
-    if (parent) {
-        if (parent->first_child == NULL) {
-            parent->first_child = tag;
-        } else {
-            rum_tag_t *child = parent->first_child;
-            while (child->next_sibling != NULL)
-                child = child->next_sibling;
-            child->next_sibling = tag;
-        }
-    }
-    return tag;
-}
-
-rum_tag_t *
-rum_tag_get_parent(const rum_tag_t *tag)
-{
-    return tag? tag->parent : NULL;
-}
-
-rum_tag_t *
-rum_tag_get_next_sibling(const rum_tag_t *tag)
-{
-    return tag? tag->next_sibling : NULL;
-}
-
-rum_tag_t *
-rum_tag_get_first_child(const rum_tag_t *tag)
-{
-    return tag? tag->first_child : NULL;
+    parser->language = language;
+    parser->state = OUTSIDE_MARKUP;
+    parser->nchunks = 1;
+    parser->pos = 0;
+    parser->substr_start = 0;
+    parser->substr_end = 0;
+    parser->quote_char = 0;
+    parser->document = NULL;
+    parser->element = NULL;
+    parser->parent = NULL;
+    return(parser);
 }
 
 static void
-rum_display_language_subtree(const rum_tag_t *root, int indent_level)
+free_parser(rum_parser_t *parser)
 {
-    const rum_tag_t *tag = root;
-    const rum_attr_t *attr = NULL;
-
-    while (tag != NULL) {
-        printf("%*sTAG %s (%s)\n", (indent_level * 3), " ", tag->name,
-            (tag->is_empty? "empty": "nonempty"));
-        for (attr = tag->attrs; attr && attr->name; ++attr) {
-            printf("%*sATTR %s (%s)\n", (indent_level * 3), " ", attr->name,
-                (attr->is_required? "required" : "optional"));
+    if (parser) {
+        if (parser->buf) {
+            free(parser->buf);
         }
-        printf("\n");
-        if (tag->first_child) {
-            rum_display_language_subtree(tag->first_child, indent_level + 1);
-        }
-        tag = tag->next_sibling;
+        free(parser);
     }
 }
 
-void
-rum_display_language(const rum_tag_t *root)
+static void
+print_input(rum_parser_t *parser, FILE *fp)
 {
-    if (root == NULL) {
-        printf("The language is undefined.\n\n");
-    } else {
-        printf("The language consists of these tags and attributes:\n\n");
-        rum_display_language_subtree(root, 0);
+    if (parser && parser->buf) {
+        parser->buf[parser->pos] = 0;
+        fputs(parser->buf, stderr);
     }
 }
 
-/*
-    language parsing functions
-    (TBD)
-*/
+static int
+add_char(rum_parser_t *parser, int c)
+{
+    char *newbuf;
+
+    parser->buf[(parser->pos)++] = c;
+
+    /* grow the buffer if needed (leaving room for a null byte) */
+    if (parser->pos == ((parser->nchunks * CHUNKSIZE) - 1)) {
+        ++(parser->nchunks);
+        if ((newbuf = realloc(parser->buf, parser->nchunks * CHUNKSIZE)) == NULL) {
+            parser->buf[parser->pos] = 0;
+            print_input(parser, stderr);
+            fprintf(stderr, "\n\n*** ERROR: Could not reallocate input buffer\n");
+            return -1;
+        }
+        parser->buf = newbuf;
+    }
+    return 0;
+}
+
+static int
+start_tag(rum_parser_t *parser)
+{
+    char *tag_name;
+
+    if (parser->element == NULL) {
+        if ((tag_name = copy_substring(parser->buf, parser->substr_start, parser->substr_end)) == NULL) {
+            fprintf(stderr, "\n\n*** ERROR: Could not allocate memory for tag name\n");
+            return -1;
+        }
+        if ((parser->element = rum_element_insert(parser->parent, parser->language, tag_name)) == NULL) {
+            print_input(parser, stderr);
+            fprintf(stderr, "\n\n*** ERROR: Invalid tag '%s'\n", tag_name);
+            free(tag_name);
+            return -1;
+        }
+        parser->substr_start = parser->substr_end = 0;
+        parser->parent = parser->element;
+
+        /* if this is the first tag encountered, it must be the root tag */
+        if (parser->document == NULL) {
+            if (parser->element->tag != parser->language) {
+                fprintf(stderr, "\n\n*** ERROR: Tag '%s' found outside root tag\n", tag_name);
+                return -1;
+            }
+            parser->document = parser->element;
+        }
+        free(tag_name);
+    }
+    return 0;
+}
+
+rum_element_t *
+rum_parse_file(FILE *fp, const rum_tag_t *language)
+{
+    int c;
+    rum_parser_t *parser;
+
+    if ((parser = new_parser(language)) == NULL) {
+        fprintf(stderr, "*** ERROR: Could not allocate memory for parser engine\n");
+        return NULL;
+    }
+
+    /* parse input a character at a time */
+    while ((c = getc(fp)) != EOF) {
+        if (!ISLEGAL(c)) {
+            print_input(parser, stderr);
+            fprintf(stderr, "\n\n*** ERROR: Illegal character 0x%x in input\n", c);
+            return NULL;
+        }
+
+        switch (parser->state) {
+            case OUTSIDE_MARKUP: /* not within any tag */
+                if (c == '<') {
+                    parser->state = OPENTAG_START;
+                } else if (!ISSPACE(c)) {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Content found outside any containing tag\n");
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_START: /* initial < of open tag */
+                if (c == '?') {
+                    parser->state = OPENPI_START;
+                } else if (c == '!') {
+                    parser->state = OPENCOMMENT_BANG;
+                } else if (ISNAMESTARTCHAR(c)) {
+                    parser->state = OPENTAG_NAME;
+                    parser->substr_start = parser->substr_end = parser->pos;
+                } else {
+                    print_input(parser, stderr);
+                    /* printing the character in hex is not terribly user-friendly;
+                     * a fuller implementation would translate newline, tab, etc.
+                     * to user-friendly strings and print the character otherwise */
+                    fprintf(stderr, "\n\n*** ERROR: Character 0x%x not allowed after '<'\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENPI_START: /* <?... */
+                if (c == '?') {
+                    parser->state = CLOSEPI_START;
+                }
+                break;
+
+            case CLOSEPI_START: /* <?...? */
+                if (c == '>') {
+                    parser->state = OUTSIDE_MARKUP;
+                } else {
+                    parser->state = OPENPI_START;
+                }
+                break;
+
+            case OPENCOMMENT_BANG: /* <! */
+                if (c == '-') {
+                    parser->state = OPENCOMMENT_BANGDASH;
+                } else {
+                    /* this diverges from XML spec by disallowing non-comment <! elements (e.g. <!ENTITY ...>) */
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid '<!' element\n");
+                    return NULL;
+                }
+                break;
+
+            case OPENCOMMENT_BANGDASH: /* <!- */
+                if (c == '-') {
+                    parser->state = COMMENT;
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Malformed comment\n");
+                    return NULL;
+                }
+                break;
+
+            case COMMENT: /* <!--... */
+                if (c == '-') {
+                    parser->state = CLOSECOMMENT_DASH;
+                }
+                break;
+
+            case CLOSECOMMENT_DASH: /* <!--...- */
+                if (c == '-') {
+                    parser->state = CLOSECOMMENT_DASHDASH;
+                } else {
+                    parser->state = COMMENT;
+                }
+                break;
+
+            case CLOSECOMMENT_DASHDASH: /* <!--...-- */
+                if (c == '>') {
+                    parser->state = OUTSIDE_MARKUP;
+                } else {
+                    /* per XML spec, -- is not allowed in comments */
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: '--' not allowed within comment\n");
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_NAME: /* <T... (partial tag name) */
+                if (c == '>') {
+                    parser->state = CONTENT_START;
+                    if (start_tag(parser) < 0) {
+                        return NULL;
+                    }
+                } else if (ISNAMECHAR(c)) {
+                    parser->substr_end = parser->pos;
+                } else if (ISSPACE(c)) {
+                    parser->state = OPENTAG_HAVE_NAME;
+                    if (start_tag(parser) < 0) {
+                        return NULL;
+                    }
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in tag name\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_HAVE_NAME: /* <TAG */
+                if (start_tag(parser) < 0) {
+                    return NULL;
+                }
+                if (c == '/') {
+                    parser->state = OPENTAG_EMPTY;
+                } else if (c == '>') {
+                    parser->state = CONTENT_START;
+                } else if (ISNAMESTARTCHAR(c)) {
+                    parser->state = OPENTAG_ATTRNAME;
+                    parser->substr_start = parser->substr_end = parser->pos;
+                } else if (!ISSPACE(c)) {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in attribute name\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_EMPTY: /* <TAG ... / */
+                if (c == '>') {
+                    if (!rum_element_get_is_empty(parser->element)) {
+                        print_input(parser, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: %s cannot be an empty tag\n",
+                            rum_element_get_name(parser->element));
+                        return NULL;
+                    }
+                    parser->state = OUTSIDE_MARKUP;
+                    parser->element = NULL;
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in attribute name\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_ATTRNAME: /* <TAG ... A... (partial attribute name) */
+                if (ISNAMECHAR(c)) {
+                    parser->substr_end = parser->pos;
+                } else if (ISSPACE(c)) {
+                    parser->state = OPENTAG_HAVE_NAME;
+                    /* @TODO add attribute with null value to element */
+                    /* @TODO when adding attributes, verify that doesn't already exist (i.e. can only appear once per tag) */
+                    parser->substr_start = parser->substr_end = 0;
+                } else if (c == '=') {
+                    parser->state = OPENTAG_ATTREQUALS;
+                    /* @TODO add attribute with null value to element */
+                    parser->substr_start = parser->substr_end = 0;
+                } else if (c == '>') {
+                    parser->state = CONTENT_START;
+                    /* @TODO add attribute with null value to element */
+                    parser->substr_start = parser->substr_end = 0;
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in attribute name\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_ATTREQUALS: /* <TAG ... ATTR= */
+                if ((c == '\'') || (c == '\"')) {
+                    parser->state = OPENTAG_ATTRVALUE;
+                    parser->quote_char = c;
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Attribute values must be quoted\n");
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_ATTRVALUE: /* <TAG ... ATTR=Q where Q is parser->quote_char */
+                if (c == parser->quote_char) {
+                    parser->state = OPENTAG_HAVEVALUE;
+                    /* @TODO
+                    validate value (any legal character except < and &, and entities)
+                    add value to element attr
+                    */
+                } else {
+                    if (!parser->substr_start) {
+                        parser->substr_start = parser->pos;
+                    }
+                    parser->substr_end = parser->pos;
+                }
+                break;
+
+            case OPENTAG_HAVEVALUE: /* <TAG ... ATTR=QVALUEQ where Q is parser->quote_char */
+                if (c == '/') {
+                    parser->state = OPENTAG_EMPTY;
+                } else if (c == '>') {
+                    parser->state = CONTENT_START;
+                } else if (ISSPACE(c)) {
+                    parser->state = OPENTAG_HAVE_NAME;
+                } else {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid attribute value\n");
+                    return NULL;
+                }
+                break;
+
+            case CONTENT_START: /* <TAG ...> */
+                if (rum_element_get_is_empty(parser->element)) {
+                    print_input(parser, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: %s must be an empty tag\n", rum_element_get_name(parser->element));
+                    return NULL;
+                }
+                /*
+                    @TODO:
+                    accept and ignore <?...?> and <!--...-->
+                    accept and translate predefined entities
+                    if </ encountered, validate close tag and start over
+                    if < encountered, recurse
+                    set element = NULL after close tag found
+                 */
+                break;
+
+            default:
+                fprintf(stderr, "\n\n*** Sorry, parser is not yet complete.\n");
+                return NULL;
+        }
+
+        if (add_char(parser, c) < 0) {
+            return NULL;
+        }
+    }
+
+    /* @TODO: return error if all tags not closed */
+    /* @TODO: separate document from parser so can free parser here */
+    return parser->document;
+}

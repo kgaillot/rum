@@ -1,3 +1,6 @@
+# vim temporary files
+.*.swp
+
 # Object files
 *.o
 *.ko
@@ -21,6 +24,7 @@
 *.dylib
 
 # Executables
+rum
 *.exe
 *.out
 *.app

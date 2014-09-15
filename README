@@ -32,7 +32,7 @@ Rudimentary Markup
 Rudimentary Markup (RuM) is a subset of XML:
 * Processing instructions (<?...?>) and comments (<!--...-->) are
   accepted by ignored;
-* <![CDATA[...]]> is not supported;
+* No <! ... > elements are supported other than comments (<![CDATA[...]]>, <!ENTITY...>, etc.)
 * Non-ASCII characters are not supported;
 * Numeric character entities (&#DECIMAL; or &#xHEX;) are not supported;
 * Each tag type may only be contained within a single parent tag type
@@ -47,6 +47,14 @@ Rudimentary Markup (RuM) is a subset of XML:
 
 Project Components
 ------------------
-* rump.c and rump.h: the RuM language definition and parsing library
+* librump.a is the parser library, consisting of:
+   * rum_language.c and rum_language.h: language definition
+   * rum_document.c and rum_document.h: document object
+   * rump.c: file parsing
+   * rump_private.h: header file for use by rump.c only
+   * rump.h: overall include file for library
 * rum.c: an application that displays files in a sample RuM language
 * samples/: sample RuM files, well-formed and not
+
+A "real" project would have a full unit test rather than a handful of sample
+files, to give more confidence in the code.

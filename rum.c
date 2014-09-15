@@ -7,9 +7,9 @@
 */
 
 #include <stdio.h>
-#include "rump.h"
+#include <rump.h>
 
-#define DEBUG 1
+#define DEBUG 0
 
 static rum_tag_t *
 define_language()
@@ -34,6 +34,7 @@ int
 main(int argc, char **argv)
 {
     rum_tag_t *language;
+    rum_element_t *document;
     FILE *infile;
 
     /* trivial command line parsing -- read from standard input or filename */
@@ -59,8 +60,12 @@ main(int argc, char **argv)
         rum_display_language(language);
     }
 
-    /* parse file (TBD) */
-    /* display file content (TBD) */
+    /* parse file */
+    if ((document = rum_parse_file(infile, language)) == NULL) {
+        return 1;
+    }
+
+    /* @TODO display document content */
 
     /* wrap it up */
     if (infile != stdin) {

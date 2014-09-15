@@ -1,13 +1,19 @@
 #
 # A "real" project would use GNU autotools rather than a simple Makefile.
 #
-HEADERS=rump.h
-OBJS=rum.o rump.o
+LDFLAGS=-L.
 CFLAGS=-I. -Wall
-CMD=rum
 
-all: $(OBJS)
-	$(CC) -o $(CMD) $(OBJS)
+# library
+HEADERS=rump.h rum_language.h rum_document.h rump_private.h
+LIBOBJS=rump.o rum_language.o rum_document.o
+LIBRARY=librump.a
+
+# application
+CMD=rum
+OBJS=rum.o
+
+all: $(CMD) $(LIBRARY)
 
 install:
 	@A="y"; while [[ $$A == "y" ]]; do \
@@ -16,7 +22,13 @@ install:
 	done
 
 clean:
-	rm -f $(CMD) $(OBJS)
+	rm -f $(CMD) $(OBJS) $(LIBRARY) $(LIBOBJS)
+
+$(CMD): $(OBJS) $(LIBRARY)
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(CMD) $(OBJS) -lrump
+
+$(LIBRARY): $(LIBOBJS)
+	ar $(ARFLAGS) $@ $^
 
 %.o: %.c $(HEADERS)
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) $(LDFLAGS) $(CPPFLAGS) -c -o $@ $<
