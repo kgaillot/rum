@@ -5,8 +5,8 @@ LDFLAGS=-L.
 CFLAGS=-I. -Wall
 
 # library
-HEADERS=rump.h rum_language.h rum_document.h rump_private.h
-LIBOBJS=rump.o rum_language.o rum_document.o
+HEADERS=rump.h rum_buffer.h rum_language.h rum_document.h rump_private.h
+LIBOBJS=rump.o rum_buffer.o rum_language.o rum_document.o
 LIBRARY=librump.a
 
 # application

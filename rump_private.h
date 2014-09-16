@@ -10,6 +10,7 @@
 #define RUM_RUMP_PRIVATE__H
 
 #include <rump.h>
+#include <rum_buffer.h>
 
 /*
  * macros for determining valid characters in various XML contexts
@@ -53,9 +54,6 @@
  * other definitions
  */
 
-/* the raw XML input will be stored in an input buffer, allocated in chunks of this many bytes */
-#define CHUNKSIZE (1024)
-
 /* enumerate the possible states of the parsing engine */
 typedef enum {
     OUTSIDE_MARKUP,        /* not within a tag, e.g. the initial open state */
@@ -85,20 +83,8 @@ typedef struct rum_parser_s {
     /* current state of engine */
     rum_state_t state;
 
-    /* keep the already-processed XML in a buffer, for back references and error reporting */
-    char *buf;
-    int nchunks;
-    size_t pos;
-
-    /* tag name, attribute name or attribute value currently being parsed, if any */
-    size_t substr_start;
-    size_t substr_end;
-
     /* attribute values can use either single or double quotes, so remember which one */
     int quote_char;
-
-    /* the parsed document object (= pointer to root element) */
-    rum_element_t *document;
 
     /* the element currently being parsed */
     rum_element_t *element;
@@ -111,25 +97,13 @@ typedef struct rum_parser_s {
  * parser functions
  */
 
-/* given an XML entity, return the corresponding plain character */
-static char entity2char(char *entity);
-
-/* copy a substring into a newly allocated buffer */
-static char *copy_substring(const char *s, size_t start, size_t end);
-
 /* constructor */
-static rum_parser_t *new_parser(const rum_tag_t *language);
-
-/* destructor */
-static void free_parser(rum_parser_t *parser);
-
-/* add character to input buffer */
-static int add_char(rum_parser_t *parser, int c);
-
-/* print raw input parsed so far */
-static void print_input(rum_parser_t *parser, FILE *fp);
+static rum_parser_t *rum_parser_new(const rum_tag_t *language);
 
 /* update parser once an element's tag name is known */
-static int start_tag(rum_parser_t *parser);
+static rum_element_t *start_tag(rum_parser_t *parser, rum_buffer_t *buffer, rum_element_t *document);
+
+/* add an empty string value for the attribute whose name is the buffer's substring */
+static int add_empty_value(rum_buffer_t *buffer, rum_element_t *element);
 
 #endif /* RUM_RUMP_PRIVATE__H */

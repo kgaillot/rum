@@ -15,16 +15,15 @@ static rum_tag_t *
 define_language()
 {
     rum_tag_t *cabinet, *shelf, *bottle, *glass;
-    static rum_attr_t shelf_attrs[] = { { "id", 0 }, { NULL, 0 } };
-    static rum_attr_t bottle_attrs[] = {
-        { "type", 1 }, { "aged", 0 }, { "vintage", 0 }, { NULL, 0 }
-    };
-    static rum_attr_t glass_attrs[] = { { "type", 1 }, { NULL, 0 } };
+    rum_attr_t shelf_attrs[] = { { "id", 0 } };
+    rum_attr_t bottle_attrs[] = { { "type", 1 }, { "aged", 0 }, { "vintage", 0 } };
+    rum_attr_t glass_attrs[] = { { "type", 1 } };
 
-    if (((cabinet = rum_tag_insert(NULL, "cabinet", 0, NULL)) == NULL)
-    || ((shelf = rum_tag_insert(cabinet, "shelf", 0, shelf_attrs)) == NULL)
-    || ((bottle = rum_tag_insert(shelf, "bottle", 0, bottle_attrs)) == NULL)
-    || ((glass = rum_tag_insert(shelf, "glass", 1, glass_attrs)) == NULL)) {
+    /* memory leak in case of error here, but since the program exits in such a case, not worrying about it */
+    if (((cabinet = rum_tag_new(NULL, "cabinet", 0, 0, NULL)) == NULL)
+    || ((shelf = rum_tag_new(cabinet, "shelf", 0, sizeof(shelf_attrs) / sizeof(rum_attr_t), shelf_attrs)) == NULL)
+    || ((bottle = rum_tag_new(shelf, "bottle", 0, sizeof(bottle_attrs) / sizeof(rum_attr_t), bottle_attrs)) == NULL)
+    || ((glass = rum_tag_new(shelf, "glass", 1, sizeof(glass_attrs) / sizeof(rum_attr_t), glass_attrs)) == NULL)) {
         return NULL;
     }
     return(cabinet);

@@ -13,7 +13,7 @@
 
 /*
     A more sophisticated library would define the language via DTD or some
-    such, but rump uses a function (rum_tag_insert()) to build the language
+    such, but rump uses a function (rum_tag_new()) to build the language
     description tag by tag.
 
     A more sophisticated library would also have better error handling and
@@ -22,7 +22,7 @@
 */
 
 rum_tag_t *
-rum_tag_insert(rum_tag_t *parent, const char *name, int is_empty, rum_attr_t *attrs)
+rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs)
 {
     rum_tag_t *tag;
 
@@ -40,16 +40,24 @@ rum_tag_insert(rum_tag_t *parent, const char *name, int is_empty, rum_attr_t *at
     tag->name = name;
     tag->parent = parent;
     tag->is_empty = is_empty;
+    tag->nattrs = nattrs;
 
-    /* for simplicity, the attrs argument is required to point to static
-     * memory; a fuller implementation would malloc a copy here */
-    tag->attrs = attrs;
-
-    /* a fuller implementation could do further validation here,
-     * such as ensuring that a tag by this name is not already defined */
+    /* copy the attribute information */
+    if (nattrs && attrs) {
+        if ((tag->attrs = malloc(sizeof(rum_attr_t) * nattrs)) == NULL) {
+            free(tag);
+            return NULL;
+        }
+        memcpy(tag->attrs, attrs, sizeof(rum_attr_t) * nattrs);
+    } else {
+        tag->attrs = NULL;
+    }
 
     /* add this tag to the tree */
     if (parent) {
+        /* a fuller implementation could do further validation here,
+         * such as ensuring that a tag by this name is not already defined */
+
         if (parent->first_child == NULL) {
             parent->first_child = tag;
         } else {
@@ -93,6 +101,18 @@ rum_tag_get_is_empty(const rum_tag_t *tag)
     return tag? tag->is_empty : 0;
 }
 
+int
+rum_tag_get_nattrs(const rum_tag_t *tag)
+{
+    return tag? tag->nattrs : 0;
+}
+
+const rum_attr_t *
+rum_tag_get_attr_by_index(const rum_tag_t *tag, int index)
+{
+        return tag && (index < tag->nattrs)? &(tag->attrs[index]) : NULL;
+}
+
 const rum_tag_t *
 rum_tag_get(const rum_tag_t *root, const char *tag_name)
 {
@@ -116,14 +136,14 @@ static void
 rum_display_language_subtree(const rum_tag_t *root, int indent_level)
 {
     const rum_tag_t *tag = root;
-    const rum_attr_t *attr = NULL;
+    int i;
 
     while (tag != NULL) {
         printf("%*sTAG %s (%s)\n", (indent_level * 3), " ", tag->name,
             (tag->is_empty? "empty": "nonempty"));
-        for (attr = tag->attrs; attr && attr->name; ++attr) {
-            printf("%*sATTR %s (%s)\n", (indent_level * 3), " ", attr->name,
-                (attr->is_required? "required" : "optional"));
+        for (i = 0; i < tag->nattrs; ++i) {
+            printf("%*sATTR %s (%s)\n", (indent_level * 3), " ", tag->attrs[i].name,
+                (tag->attrs[i].is_required? "required" : "optional"));
         }
         printf("\n");
         if (tag->first_child) {
