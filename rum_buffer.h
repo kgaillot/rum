@@ -9,12 +9,13 @@
 #ifndef RUM_BUFFER__H
 #define RUM_BUFFER__H
 
+#include <stddef.h>
+
 /* buffers will be allocated in chunks of this many bytes */
 #define CHUNKSIZE (1024)
 
 /* dynamically sized character buffer, with a current position and a current substring */
 typedef struct rum_buffer_s {
-    /* members */
     char *buf;
     int nchunks;
     size_t pos;
@@ -33,6 +34,9 @@ void rum_buffer_track_substr(rum_buffer_t *buffer);
 
 /* stop tracking a substring of a buffer */
 void rum_buffer_reset_substr(rum_buffer_t *buffer);
+
+/* strncmp against a substring of a buffer */
+int rum_buffer_substrncmp(rum_buffer_t *buffer, const char *str, size_t n);
 
 /* return a newly allocated buffer with a copy of the current substring */
 char *rum_buffer_clone_substr(rum_buffer_t * buffer);

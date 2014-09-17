@@ -23,7 +23,7 @@ rum_parser_new(const rum_tag_t *language)
     }
 
     parser->language = language;
-    parser->state = OUTSIDE_MARKUP;
+    parser->state = CONTENT;
     parser->quote_char = 0;
     parser->element = NULL;
     parser->parent = NULL;
@@ -84,6 +84,25 @@ add_empty_value(rum_buffer_t *buffer, rum_element_t *element)
     return 0;
 }
 
+static int
+set_content(rum_buffer_t *buffer, rum_element_t *element)
+{
+    char *content;
+
+    if ((content = rum_buffer_clone_substr(buffer)) == NULL) {
+        fprintf(stderr, "\n\n*** ERROR: Could not allocate memory for tag content\n");
+        return -1;
+    }
+    if (rum_element_set_content(element, content) < 0) {
+        rum_buffer_print(buffer, stderr);
+        fprintf(stderr, "\n\n*** ERROR: Invalid content\n");
+        return -1;
+    }
+    free(content);
+    rum_buffer_reset_substr(buffer);
+    return 0;
+}
+
 rum_element_t *
 rum_parse_file(FILE *fp, const rum_tag_t *language)
 {
@@ -106,6 +125,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
     }
 
     /* parse input a character at a time */
+    /*@TODO current thingy.rum is not parsed correctly - content is marked as close tag */
     while ((c = getc(fp)) != EOF) {
         if (!ISLEGAL(c)) {
             rum_buffer_print(buffer, stderr);
@@ -114,45 +134,83 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
         }
 
         switch (parser->state) {
-            case OUTSIDE_MARKUP: /* not within any tag */
+            case CONTENT: /* not within any tag */
+
+                /* '<' ends this stretch of content and starts a new tag */
                 if (c == '<') {
-                    parser->state = OPENTAG_START;
-                } else if (!ISSPACE(c)) {
-                    rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Content found outside any containing tag\n");
-                    return NULL;
+                    parser->state = START_TAG;
+
+                    /* if we haven't already stored content for this element,
+                     * then this is the first stretch of content, so store it */
+                    if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
+                        if (set_content(buffer, parser->element) < 0) {
+                            return NULL;
+                        }
+                    }
+
+                /* otherwise we are continuing a stretch of content */
+                } else {
+
+                    /* if content is not contained by a tag, only spaces are valid */
+                    if (parser->parent == NULL) {
+                        if (!ISSPACE(c)) {
+                            rum_buffer_print(buffer, stderr);
+                            fprintf(stderr, "\n\n*** ERROR: Content found outside any containing tag\n");
+                            return NULL;
+                        }
+
+                    /* if content is contained by a tag, we only track the first stretch
+                     * (we ignore content after any nested tags) */
+                    } else if (rum_element_get_content(parser->element) == NULL) {
+                        rum_buffer_track_substr(buffer);
+                    }
                 }
                 break;
 
-            case OPENTAG_START: /* initial < of open tag */
+            case START_TAG: /* < */
                 if (c == '?') {
-                    parser->state = OPENPI_START;
+                    parser->state = OPENPI;
                 } else if (c == '!') {
                     parser->state = OPENCOMMENT_BANG;
+                } else if (c == '/') {
+                    parser->state = CLOSETAG_START;
+                    if (parser->element == NULL) {
+                        rum_buffer_print(buffer, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: Close tag without open tag\n");
+                        return NULL;
+                    }
                 } else if (ISNAMESTARTCHAR(c)) {
                     parser->state = OPENTAG_NAME;
                     rum_buffer_track_substr(buffer);
                 } else {
-                    rum_buffer_print(buffer, stderr);
                     /* printing the character in hex is not terribly user-friendly;
                      * a fuller implementation would translate newline, tab, etc.
                      * to user-friendly strings and print the character otherwise */
+                    rum_buffer_print(buffer, stderr);
                     fprintf(stderr, "\n\n*** ERROR: Character 0x%x not allowed after '<'\n", c);
                     return NULL;
                 }
                 break;
 
-            case OPENPI_START: /* <?... */
+            case OPENPI: /* <?... */
                 if (c == '?') {
-                    parser->state = CLOSEPI_START;
+                    parser->state = CLOSEPI;
                 }
                 break;
 
-            case CLOSEPI_START: /* <?...? */
+            case CLOSEPI: /* <?...? */
                 if (c == '>') {
-                    parser->state = OUTSIDE_MARKUP;
+                    parser->state = CONTENT;
+
+                    /* if a PI interrupts content, and we haven't already stored content for this element,
+                     * then this is the first stretch of content, so store it */
+                    if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
+                        if (set_content(buffer, parser->element) < 0) {
+                            return NULL;
+                        }
+                    }
                 } else {
-                    parser->state = OPENPI_START;
+                    parser->state = OPENPI;
                 }
                 break;
 
@@ -160,7 +218,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 if (c == '-') {
                     parser->state = OPENCOMMENT_BANGDASH;
                 } else {
-                    /* this diverges from XML spec by disallowing non-comment <! elements (e.g. <!ENTITY ...>) */
+                    /* RuM diverges from XML by disallowing non-comment <! elements (e.g. <!ENTITY ...>) */
                     rum_buffer_print(buffer, stderr);
                     fprintf(stderr, "\n\n*** ERROR: Invalid '<!' element\n");
                     return NULL;
@@ -193,7 +251,15 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
 
             case CLOSECOMMENT_DASHDASH: /* <!--...-- */
                 if (c == '>') {
-                    parser->state = OUTSIDE_MARKUP;
+                    parser->state = CONTENT;
+
+                    /* if a comment interrupts content, and we haven't already stored content for this element,
+                     * then this is the first stretch of content, so store it */
+                    if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
+                        if (set_content(buffer, parser->element) < 0) {
+                            return NULL;
+                        }
+                    }
                 } else {
                     /* per XML spec, -- is not allowed in comments */
                     rum_buffer_print(buffer, stderr);
@@ -202,17 +268,60 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 }
                 break;
 
-            case OPENTAG_NAME: /* <T... (partial tag name) */
+            case CLOSETAG_START: /* </ */
+                if (ISNAMESTARTCHAR(c)) {
+                    parser->state = CLOSETAG_NAME;
+                    rum_buffer_track_substr(buffer);
+                } else {
+                    rum_buffer_print(buffer, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
+                    return NULL;
+                }
+                break;
+
+            case CLOSETAG_NAME: /* </T... */
                 if (c == '>') {
-                    parser->state = CONTENT_START;
-                    if ((document = start_tag(parser, buffer, document)) == NULL) {
+                    parser->state = CONTENT;
+                    if (parser->element == NULL) {
+                        rum_buffer_print(buffer, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: Close tag found without open tag\n");
                         return NULL;
                     }
+                    if (rum_buffer_substrncmp(buffer,
+                        rum_element_get_name(parser->element),
+                        strlen(rum_element_get_name(parser->element)))) {
+                            rum_buffer_print(buffer, stderr);
+                            fprintf(stderr, "\n\n*** ERROR: Close tag does not match open tag '%s'\n",
+                                rum_element_get_name(parser->element));
+                            return NULL;
+                    }
+                    parser->element = NULL;
                 } else if (ISNAMECHAR(c)) {
+                    rum_buffer_track_substr(buffer);
+                } else {
+                    rum_buffer_print(buffer, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
+                    return NULL;
+                }
+                break;
+
+            case OPENTAG_NAME: /* <T... */
+                if (ISNAMECHAR(c)) {
                     rum_buffer_track_substr(buffer);
                 } else if (ISSPACE(c)) {
                     parser->state = OPENTAG_HAVE_NAME;
                     if ((document = start_tag(parser, buffer, document)) == NULL) {
+                        return NULL;
+                    }
+                } else if (c == '>') {
+                    parser->state = CONTENT;
+                    if ((document = start_tag(parser, buffer, document)) == NULL) {
+                        return NULL;
+                    }
+                    if (rum_element_get_is_empty(parser->element)) {
+                        rum_buffer_print(buffer, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: %s must be an empty tag\n",
+                            rum_element_get_name(parser->element));
                         return NULL;
                     }
                 } else {
@@ -223,13 +332,10 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 break;
 
             case OPENTAG_HAVE_NAME: /* <TAG */
-                if ((document = start_tag(parser, buffer, document)) == NULL) {
-                    return NULL;
-                }
                 if (c == '/') {
                     parser->state = OPENTAG_EMPTY;
                 } else if (c == '>') {
-                    parser->state = CONTENT_START;
+                    parser->state = CONTENT;
                 } else if (ISNAMESTARTCHAR(c)) {
                     parser->state = OPENTAG_ATTRNAME;
                     rum_buffer_track_substr(buffer);
@@ -242,26 +348,31 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
 
             case OPENTAG_EMPTY: /* <TAG ... / */
                 if (c == '>') {
+                    parser->state = CONTENT;
                     if (!rum_element_get_is_empty(parser->element)) {
                         rum_buffer_print(buffer, stderr);
                         fprintf(stderr, "\n\n*** ERROR: %s cannot be an empty tag\n",
                             rum_element_get_name(parser->element));
                         return NULL;
                     }
-                    parser->state = OUTSIDE_MARKUP;
                     parser->element = NULL;
                 } else {
                     rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in attribute name\n", c);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character '/' in attribute name\n");
                     return NULL;
                 }
                 break;
 
-            case OPENTAG_ATTRNAME: /* <TAG ... A... (partial attribute name) */
+            case OPENTAG_ATTRNAME: /* <TAG ... A... */
                 if (ISNAMECHAR(c)) {
                     rum_buffer_track_substr(buffer);
                 } else if (ISSPACE(c)) {
                     parser->state = OPENTAG_HAVE_NAME;
+                    if (add_empty_value(buffer, parser->element) < 0) {
+                        return NULL;
+                    }
+                } else if (c == '>') {
+                    parser->state = CONTENT;
                     if (add_empty_value(buffer, parser->element) < 0) {
                         return NULL;
                     }
@@ -272,11 +383,6 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                         return NULL;
                     }
                     rum_buffer_reset_substr(buffer);
-                } else if (c == '>') {
-                    parser->state = CONTENT_START;
-                    if (add_empty_value(buffer, parser->element) < 0) {
-                        return NULL;
-                    }
                 } else {
                     rum_buffer_print(buffer, stderr);
                     fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in attribute name\n", c);
@@ -300,6 +406,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                     parser->state = OPENTAG_HAVEVALUE;
                     if ((attr_value = rum_buffer_clone_substr(buffer)) == NULL) {
                         fprintf(stderr, "\n\n*** ERROR: Could not allocate memory for attribute value\n");
+                        free(attr_name);
                         return NULL;
                     }
                     if (rum_element_set_value(parser->element, attr_name, attr_value) < 0) {
@@ -320,30 +427,20 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 if (c == '/') {
                     parser->state = OPENTAG_EMPTY;
                 } else if (c == '>') {
-                    parser->state = CONTENT_START;
+                    parser->state = CONTENT;
+                    if (rum_element_get_is_empty(parser->element)) {
+                        rum_buffer_print(buffer, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: %s must be an empty tag\n",
+                            rum_element_get_name(parser->element));
+                        return NULL;
+                    }
                 } else if (ISSPACE(c)) {
                     parser->state = OPENTAG_HAVE_NAME;
                 } else {
                     rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Invalid attribute value\n");
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x after end quote in attribute value\n", c);
                     return NULL;
                 }
-                break;
-
-            case CONTENT_START: /* <TAG ...> */
-                if (rum_element_get_is_empty(parser->element)) {
-                    rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: %s must be an empty tag\n", rum_element_get_name(parser->element));
-                    return NULL;
-                }
-                /*
-                    @TODO:
-                    accept and ignore <?...?> and <!--...-->
-                    accept and translate predefined entities
-                    if </ encountered, validate close tag and start over
-                    if < encountered, recurse
-                    set element = NULL after close tag found
-                 */
                 break;
 
             default:

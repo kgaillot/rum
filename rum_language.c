@@ -14,11 +14,16 @@
 /*
     A more sophisticated library would define the language via DTD or some
     such, but rump uses a function (rum_tag_new()) to build the language
-    description tag by tag.
+    description tag by tag. It uses a simple tree structure to store the tags,
+    so it would be inefficient to represent a language where the same tag can
+    be contained by more than one other type of tag, because the tag structure
+    will be duplicated as a child of each parent.
 
-    A more sophisticated library would also have better error handling and
-    reporting (likely an errno/errmsg setup).  Most rump functions simply
+    A "real" library would also have better error handling and
+    reporting (likely an errno/errmsg setup). Most rump functions simply
     return NULL on error with no explanation.
+
+    Memory management is also minimal, just a bunch of small mallocs.
 */
 
 rum_tag_t *
@@ -31,9 +36,7 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
         return NULL;
     }
 
-    /* create a tag instance
-     * (in the interest of brevity, no special memory management is done,
-     * just a bunch of small mallocs) */
+    /* create a tag instance */
     if ((tag = malloc(sizeof(rum_tag_t))) == NULL) {
         return NULL;
     }
@@ -55,9 +58,6 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
 
     /* add this tag to the tree */
     if (parent) {
-        /* a fuller implementation could do further validation here,
-         * such as ensuring that a tag by this name is not already defined */
-
         if (parent->first_child == NULL) {
             parent->first_child = tag;
         } else {

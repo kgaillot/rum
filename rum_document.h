@@ -47,8 +47,12 @@ rum_element_t *rum_element_new(rum_element_t *parent, const rum_tag_t *language,
 /* accessors */
 const char *rum_element_get_name(const rum_element_t *element);
 int rum_element_get_is_empty(const rum_element_t *element);
+const char *rum_element_get_content(const rum_element_t *element);
 
 /* add a value to an attribute */
 int rum_element_set_value(rum_element_t *element, const char *attr_name, const char *attr_value);
+
+/* add content to an element */
+int rum_element_set_content(rum_element_t *element, const char *content);
 
 #endif /* RUM_DOCUMENT__H */

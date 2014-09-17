@@ -60,6 +60,21 @@ rum_buffer_reset_substr(rum_buffer_t *buffer)
     }
 }
 
+int
+rum_buffer_substrncmp(rum_buffer_t *buffer, const char *str, size_t n)
+{
+    size_t len;
+
+    if (buffer == NULL) {
+        return (str == NULL)? 0 : -1;
+    }
+    if (str == NULL) {
+        return 1;
+    }
+    len = buffer->substr_end - buffer->substr_start + 1;
+    return strncmp(str, buffer->buf + buffer->substr_start, (n < len)? n : len);
+}
+
 char*
 rum_buffer_clone_substr(rum_buffer_t *buffer)
 {

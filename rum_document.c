@@ -71,6 +71,12 @@ rum_element_get_is_empty(const rum_element_t *element)
     return ((element == NULL) || (element->tag == NULL))? 0 : rum_tag_get_is_empty(element->tag);
 }
 
+const char *
+rum_element_get_content(const rum_element_t *element)
+{
+        return (element == NULL)? NULL : element->content;
+}
+
 /* clone XML content, replacing entity references and verifying well-formedness */
 static char *
 xmlcontent2plaintext(const char *content)
@@ -196,4 +202,19 @@ rum_element_set_value(rum_element_t *element, const char *attr_name, const char 
 
     /* error if attribute name is not valid for this tag */
     return -1;
+}
+
+int
+rum_element_set_content(rum_element_t *element, const char *content)
+{
+        if (!element) {
+            return -1;
+        }
+        if (!content) {
+            return 0;
+        }
+        if ((element->content = xmlcontent2plaintext(content)) == NULL) {
+            return -1;
+        }
+        return 0;
 }

@@ -56,8 +56,8 @@
 
 /* enumerate the possible states of the parsing engine */
 typedef enum {
-    OUTSIDE_MARKUP,        /* not within a tag, e.g. the initial open state */
-    OPENTAG_START,         /* first "<" of an open tag has been encountered */
+    CONTENT,               /* not within a tag, e.g. the initial open state, or between tags */
+    START_TAG,             /* "<" has been encountered */
     OPENTAG_NAME,          /* portion of the tag name in an open tag has been encountered */
     OPENTAG_HAVE_NAME,     /* entire tag name in an open tag has been encountered */
     OPENTAG_EMPTY,         /* "/" of the end of an empty tag has been encountered */
@@ -65,14 +65,15 @@ typedef enum {
     OPENTAG_ATTREQUALS,    /* "=" in an open tag attribute has been encountered */
     OPENTAG_ATTRVALUE,     /* portion of an attribute value in an open tag has been encountered */
     OPENTAG_HAVEVALUE,     /* complete attribute name/value pair in an open tag has been encountered */
-    OPENPI_START,          /* "<?" of a processing instruction has been encountered */
-    CLOSEPI_START,         /* "?" of the "?>" at the end of a processing instruction has been encountered */
+    OPENPI,                /* "<?" of a processing instruction has been encountered */
+    CLOSEPI,               /* "?" of the "?>" at the end of a processing instruction has been encountered */
     OPENCOMMENT_BANG,      /* "<!" of a comment has been encountered */
     OPENCOMMENT_BANGDASH,  /* "<!-" of a comment has been encountered */
     COMMENT,               /* portion of the body of a comment has been encountered */
     CLOSECOMMENT_DASH,     /* "-" of the "-->" at the end of a comment has been encountered */
     CLOSECOMMENT_DASHDASH, /* "--" of the "-->" at the end of a comment has been encountered */
-    CONTENT_START,         /* entire open tag has been encountered */
+    CLOSETAG_START,        /* "</" of close tag has been encountered */
+    CLOSETAG_NAME          /* portion of the tag name in a close tag has been encountered */
 } rum_state_t;
 
 /* parser engine */
@@ -105,5 +106,8 @@ static rum_element_t *start_tag(rum_parser_t *parser, rum_buffer_t *buffer, rum_
 
 /* add an empty string value for the attribute whose name is the buffer's substring */
 static int add_empty_value(rum_buffer_t *buffer, rum_element_t *element);
+
+/* set the element's content to be a clone of the buffer substring */
+static int set_content(rum_buffer_t *buffer, rum_element_t *element);
 
 #endif /* RUM_RUMP_PRIVATE__H */
