@@ -5,7 +5,7 @@ LDFLAGS=-L.
 CFLAGS=-I. -Wall
 
 # library
-HEADERS=rump.h rum_buffer.h rum_language.h rum_document.h rump_private.h
+HEADERS=rump.h rum_buffer.h rum_language.h rum_document.h rum_types.h rump_private.h
 LIBOBJS=rump.o rum_buffer.o rum_language.o rum_document.o
 LIBRARY=librump.a
 
@@ -17,7 +17,7 @@ all: $(CMD) $(LIBRARY)
 
 install:
 	@A="y"; while [[ $$A == "y" ]]; do \
-		echo "Are you sure you want to install? (y/n) \c"; \
+		/bin/echo -n "Are you sure you want to install? (y/n) "; \
 		read A; \
 	done
 

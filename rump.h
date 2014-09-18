@@ -10,6 +10,7 @@
 #define RUM_RUMP__H
 
 #include <stdio.h>
+#include <rum_types.h>
 #include <rum_language.h>
 #include <rum_document.h>
 

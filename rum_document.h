@@ -1,5 +1,5 @@
 /*
-    rump.h
+    rum_document.h
 
     header for language document portion of RuM parser library
 
@@ -9,21 +9,21 @@
 #ifndef RUM_DOCUMENT__H
 #define RUM_DOCUMENT__H
 
-#include <rum_language.h>
+#include <rum_types.h>
 
 /* XML element: a tag instance and its associated attribute values and content */
-typedef struct rum_element_s {
+struct rum_element_s {
     /* this tag's place in the document's tag tree */
-    struct rum_element_s *next_sibling;
-    struct rum_element_s *first_child;
+    rum_element_t *next_sibling;
+    rum_element_t *first_child;
 
     /* tag that this element is an instance of */
     const rum_tag_t *tag;
 
     /* list of attribute values, one per attribute supported by the tag
      *
-     * this assumes that the tag is immutable by the time this element is created
-     * (adding or removing attributes in the tag would break this)
+     * this assumes that the tag spec is immutable by the time this element is created
+     * (adding or removing attributes in the tag spec would break this)
      *
      * NULL indicates the attribute was not specified;
      * empty string indicates the attribute was specified with no value
@@ -33,26 +33,32 @@ typedef struct rum_element_s {
 
     /* this element's content (NULL for empty tags) */
     char *content;
-} rum_element_t;
+};
 
 /* a document is simply a pointer to the root element */
 
 /* constructor: create a new element instance and insert into document model */
 rum_element_t *rum_element_new(rum_element_t *parent, const rum_tag_t *language, const char *tag_name);
 
-/* destructor */
-/* not implementing: would remove element from document model and free its allocated memory */
-/*void rum_element_free(rum_element_t *parent, rum_element_t *element);*/
-
 /* accessors */
+rum_element_t *rum_element_get_next_sibling(const rum_element_t *tag);
+rum_element_t *rum_element_get_first_child(const rum_element_t *tag);
 const char *rum_element_get_name(const rum_element_t *element);
 int rum_element_get_is_empty(const rum_element_t *element);
 const char *rum_element_get_content(const rum_element_t *element);
+const char *rum_element_get_value(const rum_element_t *element, const char *attr_name);
 
-/* add a value to an attribute */
+/* add a value to an attribute of the element */
 int rum_element_set_value(rum_element_t *element, const char *attr_name, const char *attr_value);
 
-/* add content to an element */
+/* add content to the element */
 int rum_element_set_content(rum_element_t *element, const char *content);
+
+/* display this element and its siblings and children
+ *
+ * each element's display method is called in sequence, starting with this element itself,
+ * then all its children, then all its siblings (each displayed in the same manner)
+ */
+int rum_element_display(const rum_element_t *element);
 
 #endif /* RUM_DOCUMENT__H */

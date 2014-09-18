@@ -46,6 +46,7 @@ Rudimentary Markup (RuM) is a subset of XML:
 Project Components
 ------------------
 * librump.a is the parser library, consisting of:
+   * rum_types.h: typedef's for language and document objects
    * rum_buffer.c and rum_buffer.h: large string buffer handling
    * rum_language.c and rum_language.h: language definition
    * rum_document.c and rum_document.h: document object
@@ -55,5 +56,7 @@ Project Components
 * rum.c: an application that displays files in a sample RuM language
 * samples/: sample RuM files, well-formed and not
 
-A "real" project would have a full unit test rather than a handful of sample
-files, to give more confidence in the code.
+Though not a full validating parser, the parser does do some language validation:
+* It knows the root tag, and requires it as the outermost tag.
+* It knows and enforces which tags may contain which other tags.
+* It knows and enforces which attributes are valid for which tags.

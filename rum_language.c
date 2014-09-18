@@ -27,7 +27,8 @@
 */
 
 rum_tag_t *
-rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs)
+rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs,
+    rum_tag_display_method_t display_method)
 {
     rum_tag_t *tag;
 
@@ -44,6 +45,7 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
     tag->parent = parent;
     tag->is_empty = is_empty;
     tag->nattrs = nattrs;
+    tag->display = display_method;
 
     /* copy the attribute information */
     if (nattrs && attrs) {
@@ -107,10 +109,10 @@ rum_tag_get_nattrs(const rum_tag_t *tag)
     return tag? tag->nattrs : 0;
 }
 
-const rum_attr_t *
-rum_tag_get_attr_by_index(const rum_tag_t *tag, int index)
+const char *
+rum_tag_get_attr_name(const rum_tag_t *tag, int index)
 {
-        return tag && (index < tag->nattrs)? &(tag->attrs[index]) : NULL;
+        return tag && (index < tag->nattrs)? tag->attrs[index].name : NULL;
 }
 
 const rum_tag_t *
@@ -162,4 +164,10 @@ rum_display_language(const rum_tag_t *root)
         printf("The language consists of these tags and attributes:\n\n");
         rum_display_language_subtree(root, 0);
     }
+}
+
+int
+rum_tag_display_element(const rum_tag_t *tag, const rum_element_t *element)
+{
+    return(tag->display(element));
 }

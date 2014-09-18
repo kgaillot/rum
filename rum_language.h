@@ -9,22 +9,27 @@
 #ifndef RUM_LANGUAGE__H
 #define RUM_LANGUAGE__H
 
+#include <rum_types.h>
+
 /* language definition of an XML attribute (name="value") */
-typedef struct rum_attr_s {
+struct rum_attr_s {
     /* this attribute's name */
     const char *name;
 
-    /* whether this attribute is required to be present in its tag (boolean) */
+    /* whether this attribute is required to be present in its tag (boolean)
+     *
+     * @TODO in the interest of time, this functionality is not implemented; this value is set but ignored
+     */
     int is_required;
-} rum_attr_t;
+};
 
 /* language definition of an XML tag: <tag [attrs] /> if empty, <tag [attrs]> ... </tag> otherwise */
-typedef struct rum_tag_s {
+struct rum_tag_s {
     /* this tag's place in the language's tag tree;
      * parent is NULL if this is the root tag, otherwise this tag is only valid within parent */
-    struct rum_tag_s *parent;
-    struct rum_tag_s *next_sibling;
-    struct rum_tag_s *first_child;
+    rum_tag_t *parent;
+    rum_tag_t *next_sibling;
+    rum_tag_t *first_child;
 
     /* the tag itself */
     const char *name;
@@ -35,17 +40,16 @@ typedef struct rum_tag_s {
     /* list of attributes accepted by this tag */
     int nattrs; /* pedantic: should be size_t ... */
     rum_attr_t *attrs;
-} rum_tag_t;
+
+    /* a method to display elements of this tag type */
+    rum_tag_display_method_t display;
+};
 
 /* a language definition is simply a pointer to the root tag */
 
 /* constructor */
-rum_tag_t *rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs);
-
-/* destructor
- * not implementing; would remove tag from tree and free its allocated memory
- */
-/*void rum_tag_free(rum_tag_t *ancestor, const char *name);*/
+rum_tag_t *rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs,
+        rum_tag_display_method_t display_method);
 
 /* accessors */
 rum_tag_t *rum_tag_get_parent(const rum_tag_t *tag);
@@ -54,12 +58,15 @@ rum_tag_t *rum_tag_get_first_child(const rum_tag_t *tag);
 const char *rum_tag_get_name(const rum_tag_t *tag);
 int rum_tag_get_is_empty(const rum_tag_t *tag);
 int rum_tag_get_nattrs(const rum_tag_t *tag);
-const rum_attr_t *rum_tag_get_attr_by_index(const rum_tag_t *tag, int index);
+const char *rum_tag_get_attr_name(const rum_tag_t *tag, int index);
 
 /* return language tag corresponding to tag_name, or NULL if tag_name is invalid */
 const rum_tag_t *rum_tag_get(const rum_tag_t *root, const char *tag_name);
 
 /* print language in human-readable form */
 void rum_display_language(const rum_tag_t *root);
+
+/* call display method on an element */
+int rum_tag_display_element(const rum_tag_t *tag, const rum_element_t *element);
 
 #endif /* RUM_LANGUAGE__H */

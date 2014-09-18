@@ -111,6 +111,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
     rum_buffer_t *buffer;
     rum_element_t *document = NULL;
     char *attr_name = NULL, *attr_value = NULL;
+    const char *tag_name;
 
     if ((parser = rum_parser_new(language)) == NULL) {
         fprintf(stderr, "*** ERROR: Could not allocate memory for parser engine\n");
@@ -125,7 +126,6 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
     }
 
     /* parse input a character at a time */
-    /*@TODO current thingy.rum is not parsed correctly - content is marked as close tag */
     while ((c = getc(fp)) != EOF) {
         if (!ISLEGAL(c)) {
             rum_buffer_print(buffer, stderr);
@@ -140,7 +140,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 if (c == '<') {
                     parser->state = START_TAG;
 
-                    /* if we haven't already stored content for this element,
+                    /* if we're parsing an element, and it doesn't have content yet,
                      * then this is the first stretch of content, so store it */
                     if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
                         if (set_content(buffer, parser->element) < 0) {
@@ -202,8 +202,8 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 if (c == '>') {
                     parser->state = CONTENT;
 
-                    /* if a PI interrupts content, and we haven't already stored content for this element,
-                     * then this is the first stretch of content, so store it */
+                    /* if we're parsing an element, and it doesn't have content yet,
+                     * then the PI interrupted the first stretch of content, so store that */
                     if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
                         if (set_content(buffer, parser->element) < 0) {
                             return NULL;
@@ -253,8 +253,8 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 if (c == '>') {
                     parser->state = CONTENT;
 
-                    /* if a comment interrupts content, and we haven't already stored content for this element,
-                     * then this is the first stretch of content, so store it */
+                    /* if we're parsing an element, and it doesn't have content yet,
+                     * then the comment interrupted the first stretch of content, so store that */
                     if ((parser->element != NULL) && (rum_element_get_content(parser->element) == NULL)) {
                         if (set_content(buffer, parser->element) < 0) {
                             return NULL;
@@ -264,43 +264,6 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                     /* per XML spec, -- is not allowed in comments */
                     rum_buffer_print(buffer, stderr);
                     fprintf(stderr, "\n\n*** ERROR: '--' not allowed within comment\n");
-                    return NULL;
-                }
-                break;
-
-            case CLOSETAG_START: /* </ */
-                if (ISNAMESTARTCHAR(c)) {
-                    parser->state = CLOSETAG_NAME;
-                    rum_buffer_track_substr(buffer);
-                } else {
-                    rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
-                    return NULL;
-                }
-                break;
-
-            case CLOSETAG_NAME: /* </T... */
-                if (c == '>') {
-                    parser->state = CONTENT;
-                    if (parser->element == NULL) {
-                        rum_buffer_print(buffer, stderr);
-                        fprintf(stderr, "\n\n*** ERROR: Close tag found without open tag\n");
-                        return NULL;
-                    }
-                    if (rum_buffer_substrncmp(buffer,
-                        rum_element_get_name(parser->element),
-                        strlen(rum_element_get_name(parser->element)))) {
-                            rum_buffer_print(buffer, stderr);
-                            fprintf(stderr, "\n\n*** ERROR: Close tag does not match open tag '%s'\n",
-                                rum_element_get_name(parser->element));
-                            return NULL;
-                    }
-                    parser->element = NULL;
-                } else if (ISNAMECHAR(c)) {
-                    rum_buffer_track_substr(buffer);
-                } else {
-                    rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
                     return NULL;
                 }
                 break;
@@ -358,7 +321,7 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                     parser->element = NULL;
                 } else {
                     rum_buffer_print(buffer, stderr);
-                    fprintf(stderr, "\n\n*** ERROR: Invalid character '/' in attribute name\n");
+                    fprintf(stderr, "\n\n*** ERROR: '/' not followed by '>' in open tag\n");
                     return NULL;
                 }
                 break;
@@ -443,9 +406,40 @@ rum_parse_file(FILE *fp, const rum_tag_t *language)
                 }
                 break;
 
-            default:
-                fprintf(stderr, "\n\n*** Sorry, parser is not yet complete.\n");
-                return NULL;
+            case CLOSETAG_START: /* </ */
+                if (ISNAMESTARTCHAR(c)) {
+                    parser->state = CLOSETAG_NAME;
+                    rum_buffer_track_substr(buffer);
+                } else {
+                    rum_buffer_print(buffer, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
+                    return NULL;
+                }
+                break;
+
+            case CLOSETAG_NAME: /* </T... */
+                if (ISNAMECHAR(c)) {
+                    rum_buffer_track_substr(buffer);
+                } else if (c == '>') {
+                    parser->state = CONTENT;
+                    if (parser->element == NULL) {
+                        rum_buffer_print(buffer, stderr);
+                        fprintf(stderr, "\n\n*** ERROR: Close tag found without open tag\n");
+                        return NULL;
+                    }
+                    tag_name = rum_element_get_name(parser->element);
+                    if (rum_buffer_substrncmp(buffer, tag_name, strlen(tag_name))) {
+                            rum_buffer_print(buffer, stderr);
+                            fprintf(stderr, "\n\n*** ERROR: Close tag does not match open tag '%s'\n", tag_name);
+                            return NULL;
+                    }
+                    parser->element = NULL;
+                } else {
+                    rum_buffer_print(buffer, stderr);
+                    fprintf(stderr, "\n\n*** ERROR: Invalid character 0x%x in close tag\n", c);
+                    return NULL;
+                }
+                break;
         }
 
         if (rum_buffer_add_char(buffer, c) < 0) {

@@ -59,6 +59,18 @@ rum_element_new(rum_element_t *parent, const rum_tag_t *language, const char *ta
     return element;
 }
 
+rum_element_t *
+rum_element_get_next_sibling(const rum_element_t *element)
+{
+    return element? element->next_sibling : NULL;
+}
+
+rum_element_t *
+rum_element_get_first_child(const rum_element_t *element)
+{
+    return element? element->first_child : NULL;
+}
+
 const char *
 rum_element_get_name(const rum_element_t *element)
 {
@@ -74,7 +86,28 @@ rum_element_get_is_empty(const rum_element_t *element)
 const char *
 rum_element_get_content(const rum_element_t *element)
 {
-        return (element == NULL)? NULL : element->content;
+    return (element == NULL)? NULL : element->content;
+}
+
+const char *
+rum_element_get_value(const rum_element_t *element, const char *attr_name)
+{
+    int i;
+    const rum_tag_t *tag;
+    const char *attr_name2;
+
+    if ((element == NULL) || (attr_name == NULL)) {
+        return NULL;
+    }
+    tag = element->tag;
+    for (i = 0; i < rum_tag_get_nattrs(tag); ++i) {
+        if ((attr_name2 = rum_tag_get_attr_name(tag, i)) != NULL) {
+            if (!strcmp(attr_name, attr_name2)) {
+                return element->values[i];
+            }
+        }
+    }
+    return NULL;
 }
 
 /* clone XML content, replacing entity references and verifying well-formedness */
@@ -168,7 +201,7 @@ int
 rum_element_set_value(rum_element_t *element, const char *attr_name, const char *attr_value)
 {
     int i;
-    const rum_attr_t *attr;
+    const char *attr_name2;
 
     /* assert(element has been constructed) */
     if (element && element->tag && element->values && attr_name) {
@@ -177,12 +210,12 @@ rum_element_set_value(rum_element_t *element, const char *attr_name, const char 
         for (i = 0; i < rum_tag_get_nattrs(element->tag); ++i) {
 
             /* assert(this index has a matching attribute) */
-            if ((attr = rum_tag_get_attr_by_index(element->tag, i)) == NULL) {
+            if ((attr_name2 = rum_tag_get_attr_name(element->tag, i)) == NULL) {
                 return -1;
             }
 
             /* if this is the attribute we're looking for ... */
-            if (!strcmp(attr_name, attr->name)) {
+            if (!strcmp(attr_name, attr_name2)) {
 
                 /* per XML spec, error if a value has already been set for this attribute in this tag */
                 if (element->values[i] != NULL) {
@@ -217,4 +250,19 @@ rum_element_set_content(rum_element_t *element, const char *content)
             return -1;
         }
         return 0;
+}
+
+int
+rum_element_display(const rum_element_t *element)
+{
+    if (rum_tag_display_element(element->tag, element) < 0) {
+        return -1;
+    }
+    if (element->first_child) {
+        rum_element_display(element->first_child);
+    }
+    if (element->next_sibling) {
+        rum_element_display(element->next_sibling);
+    }
+    return 0;
 }
