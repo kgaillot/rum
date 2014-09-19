@@ -1,37 +1,12 @@
-Specification
--------------
-"The goal is to write a primitive XML parser using only the standard
-glibc library.
-
-The program should:
-* read in an xml file, 
-* parse it into a data structure of your choosing, and
-* print it to the screen.
-
-If an error (such as a mis-matching close tag) is detected, the
-program should:
-* display an error,
-* print the xml read in so far, and
-* terminate
-
-For the purposes of this assignment, there is no need to create a
-validating parser, so you don't have to worry about DTDs or Schemas.
-
-Additionally, the presence of processing instructions (ie. anything
-between '<?' and '?>') and comments (ie. anything between '<!--' and
-'-->') should be tolerated but their contents can be ignored."
-
-With that description having quite a bit of leeway, this project defines a
-subset of XML called Rudimentary Markup (RuM), a library for defining and
-parsing arbitary languages conforming to RuM, a sample language,
-and an application to display files written in the sample language.
+Project specification
+---------------------
+See README.spec.
 
 
 Rudimentary Markup
 ------------------
 Rudimentary Markup (RuM) is a subset of XML:
-* Processing instructions (<?...?>) and comments (<!--...-->) are
-  accepted by ignored;
+* Processing instructions (<?...?>) and comments (<!--...-->) are accepted by ignored;
 * No <! ... > elements are supported other than comments (<![CDATA[...]]>, <!ENTITY...>, etc.)
 * Non-ASCII characters are not supported;
 * Numeric character entities (&#DECIMAL; or &#xHEX;) are not supported;
@@ -39,24 +14,100 @@ Rudimentary Markup (RuM) is a subset of XML:
   the application will always receive "XXX" as the content of T1:
      <T1>XXX</T1>
      <T1>XXX <T2>YYY</T2> </T1>    <!-- YYY is content of T2 -->
-     <T1>XXX <T2>YYT</T2> ZZZ</T1> <!-- ZZZ is ignored -->
+     <T1>XXX <T2>YYY</T2> ZZZ</T1> <!-- ZZZ is ignored -->
 * Other minor limitations not worth detailing.
 
 
-Project Components
-------------------
-* librump.a is the parser library, consisting of:
-   * rum_types.h: typedef's for language and document objects
-   * rum_buffer.c and rum_buffer.h: large string buffer handling
-   * rum_language.c and rum_language.h: language definition
-   * rum_document.c and rum_document.h: document object
-   * rump.c: file parsing
-   * rump_private.h: header file for use by rump.c only
-   * rump.h: overall include file for library
-* rum.c: an application that displays files in a sample RuM language
-* samples/: sample RuM files, well-formed and not
+The library
+-----------
+The RuM parser library, librump.a, consists of these parts:
+
+* rum_types.h: typedef's for language and document objects. Putting them
+in a separate header allows two different objects to reference each other.
+
+* rum_buffer.c and rum_buffer.h: This is a support object for the use of
+the parser but is exposed to users (all one of them) in case they want
+to use it. It defines a character buffer object that can be dynamically
+resized as characters are added to it. The buffer can track a substring
+of itself based on start and end positions, allowing the calling code
+to "bookmark" a section of the buffer.
+
+* rum_language.c and rum_language.h: This portion of the library allows
+calling code to define a RuM-conformant language. The caller can specify
+each tag, including what attributes the tag takes and which other tags
+may contain it. This is basically a low-rent replacement for DTDs.
+
+The main language object is the tag specification. Tags are stored
+in a tree strucutre, so a language is simply a pointer to the root tag.
+
+Tags have a function-pointer-based display method, intended for
+the calling code to specify how each tag type should be displayed.
+
+* rum_document.c and rum_document.h: This portion of the library
+defines the document object (a particular textual instance of
+the defined language).
+
+The main document object is the element, which corresponds to
+a tag instance with its attribute values and content. Elements
+also are stored in a tree structure, and a document is simply
+a pointer to the root element.
+
+The document object handles replacement of predefined entities
+(&amp; etc.).
+
+The document object's display function iterates through the
+element tree, calling the appropriate display method for each.
+
+* rump.h: overall include file for library, that includes
+the other includes
+
+* rump.c and rump_private.h: the parser engine itself. This part
+is still under active development and may change substantially.
+This contains the file parser function, which is basically a
+giant state engine. It processes one character at a time.
 
 Though not a full validating parser, the parser does do some language validation:
-* It knows the root tag, and requires it as the outermost tag.
-* It knows and enforces which tags may contain which other tags.
-* It knows and enforces which attributes are valid for which tags.
+- It knows the root tag, and requires it as the outermost tag.
+- It knows and enforces which tags may contain which other tags.
+- It knows and enforces which attributes are valid for which tags.
+
+As of this writing, the parser can handle everything except nested tags
+(whitespace, comments, processing instructions, and the root tag,
+with attributes and content, and correctly handling errors).
+Much of the infrastructure is in place for nested tags, so it should
+be finished soon.
+
+
+The application
+---------------
+* rum.c is the application. It defines a sample RuM-conformant language
+and displays files written in that language. It has the usual Unix utility
+behavior of accepting a filename or stdin, so it can be used like:
+
+	rum samples/illegal_char.rum
+	rum < samples/illegal_char.rum
+	cat samples/illegal_char.rum | rum
+
+* samples/: This directory contains sample RuM files, well-formed and not.
+
+
+Limitations
+-----------
+Since this is a demonstration project, some corners were cut:
+
+* Memory management is minimal. There are lots of small mallocs and frees,
+and some duplication that could be eliminated.
+
+* Error handling and reporting is minimal. If this were a "real" project,
+I'd add an errno/errmsg mechanism and do better reporting with it.
+
+* The tree structure for language specification is inefficient when a tag may
+be included by more than one other tag, but it is sufficient for this project.
+
+* A "real" project would have to pay more attention to security concerns,
+although a simple memory limit would take care of most of it, since RuM
+doesn't support <!ENTITY> expansion.
+
+* There are no command-line options. For a "real" project, I'd at least
+add standard --debug/--version/--help options, and for any expansions
+such as the memory limit or a configurable chunk size for the buffer.

@@ -122,8 +122,6 @@ xmlcontent2plaintext(const char *content)
         return "";
     }
 
-    /* a production library would have an errno/errmsg facility for improved error messages */
-
     /* allocate space for the value
      *
      * if there are entity replacements, this will end up wasting some space
