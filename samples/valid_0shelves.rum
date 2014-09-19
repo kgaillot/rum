@@ -1,0 +1,6 @@
+   
+
+	
+<?this is a processing instruction and is ignored ?>
+<!-- this is <? a comment & &amp; <a> nothing it is parsed -->
+<cabinet>hello <!-- another comment --> world</cabinet>
