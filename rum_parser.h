@@ -98,17 +98,22 @@ struct rum_parser_s {
 /* return a string representation of a parser state */
 char *rum_state_str(rum_state_t state);
 
-/* stack constructor */
+/* convenience routine to initialize a new parser state stack, returning the head */
 rum_parser_t *rum_parser_new();
 
-/* stack push/pop */
+/* convenience routine to pop all items off a parser state stack */
+void rum_parser_free(rum_parser_t **headp);
+
+/* push a parser state onto the stack */
 int rum_parser_push(rum_parser_t **headp, rum_state_t state);
+
+/* pop a parser state off the stack, returning the element that it had parsed */
 rum_element_t *rum_parser_pop(rum_parser_t **headp);
 
 /* free any memory allocated for the last attribute name, and reset it to NULL */
 void rum_parser_clear_attr_name(rum_parser_t *parser);
 
-/* parse a character according to the current state */
+/* parse a character according to the current state, returning the element currently being parsed */
 rum_element_t *rum_parser_parse_char(rum_parser_t **headp, const rum_tag_t *language, rum_buffer_t *buffer, int c);
 
 #endif /* RUM_PARSER__H */

@@ -153,7 +153,7 @@ rum_tag_get_child(const rum_tag_t *root, const char *tag_name)
             }
         }
     }
-    rum_set_error("Unknown tag");
+    rum_set_error("Tag encountered that is not allowed here");
     return NULL;
 }
 

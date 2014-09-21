@@ -18,42 +18,24 @@ char *
 rum_state_str(rum_state_t state)
 {
     switch (state) {
-        case RUM_CONTENT:
-            return("RUM_CONTENT");
-        case RUM_START_TAG:
-            return("RUM_START_TAG");
-        case RUM_OPENTAG_NAME:
-            return("RUM_OPENTAG_NAME");
-        case RUM_OPENTAG_SPACE:
-            return("RUM_OPENTAG_SPACE");
-        case RUM_OPENTAG_EMPTY:
-            return("RUM_OPENTAG_EMPTY");
-        case RUM_OPENTAG_ATTRNAME:
-            return("RUM_OPENTAG_ATTRNAME");
-        case RUM_OPENTAG_ATTREQUALS:
-            return("RUM_OPENTAG_ATTREQUALS");
-        case RUM_OPENTAG_ATTRVALUE:
-            return("RUM_OPENTAG_ATTRVALUE");
-        case RUM_OPENTAG_HAVEVALUE:
-            return("RUM_OPENTAG_HAVEVALUE");
-        case RUM_OPENPI:
-            return("RUM_OPENPI");
-        case RUM_CLOSEPI:
-            return("RUM_CLOSEPI");
-        case RUM_OPENCOMMENT_BANG:
-            return("RUM_OPENCOMMENT_BANG");
-        case RUM_OPENCOMMENT_BANGDASH:
-            return("RUM_OPENCOMMENT_BANGDASH");
-        case RUM_COMMENT:
-            return("RUM_COMMENT");
-        case RUM_CLOSECOMMENT_DASH:
-            return("RUM_CLOSECOMMENT_DASH");
-        case RUM_CLOSECOMMENT_DASHDASH:
-            return("RUM_CLOSECOMMENT_DASHDASH");
-        case RUM_CLOSETAG_START:
-            return("RUM_CLOSETAG_START");
-        case RUM_CLOSETAG_NAME:
-            return("RUM_CLOSETAG_NAME");
+        case RUM_CONTENT:               return("RUM_CONTENT");
+        case RUM_START_TAG:             return("RUM_START_TAG");
+        case RUM_OPENTAG_NAME:          return("RUM_OPENTAG_NAME");
+        case RUM_OPENTAG_SPACE:         return("RUM_OPENTAG_SPACE");
+        case RUM_OPENTAG_EMPTY:         return("RUM_OPENTAG_EMPTY");
+        case RUM_OPENTAG_ATTRNAME:      return("RUM_OPENTAG_ATTRNAME");
+        case RUM_OPENTAG_ATTREQUALS:    return("RUM_OPENTAG_ATTREQUALS");
+        case RUM_OPENTAG_ATTRVALUE:     return("RUM_OPENTAG_ATTRVALUE");
+        case RUM_OPENTAG_HAVEVALUE:     return("RUM_OPENTAG_HAVEVALUE");
+        case RUM_OPENPI:                return("RUM_OPENPI");
+        case RUM_CLOSEPI:               return("RUM_CLOSEPI");
+        case RUM_OPENCOMMENT_BANG:      return("RUM_OPENCOMMENT_BANG");
+        case RUM_OPENCOMMENT_BANGDASH:  return("RUM_OPENCOMMENT_BANGDASH");
+        case RUM_COMMENT:               return("RUM_COMMENT");
+        case RUM_CLOSECOMMENT_DASH:     return("RUM_CLOSECOMMENT_DASH");
+        case RUM_CLOSECOMMENT_DASHDASH: return("RUM_CLOSECOMMENT_DASHDASH");
+        case RUM_CLOSETAG_START:        return("RUM_CLOSETAG_START");
+        case RUM_CLOSETAG_NAME:         return("RUM_CLOSETAG_NAME");
     }
     return("(invalid state)");
 }
@@ -65,6 +47,17 @@ rum_parser_new()
 
     rum_set_error(NULL);
     return (rum_parser_push(&head, RUM_CONTENT) < 0)? NULL : head;
+}
+
+void
+rum_parser_free(rum_parser_t **headp)
+{
+    rum_set_error(NULL);
+    if (headp) {
+        while (*headp) {
+            rum_parser_pop(headp);
+        }
+    }
 }
 
 int
@@ -107,7 +100,9 @@ rum_parser_pop(rum_parser_t **headp)
     old_head = *headp;
     element = old_head->element;
     *headp = old_head->prev;
-    (*headp)->next = NULL;
+    if (*headp) {
+        (*headp)->next = NULL;
+    }
     rum_parser_clear_attr_name(old_head);
     free(old_head);
     return element;
@@ -372,6 +367,13 @@ rum_parser_parse_char(rum_parser_t **headp, const rum_tag_t *language, rum_buffe
                 if (rum_element_get_is_empty((*headp)->element)) {
                     return rum_parser_error(*headp, "Empty tag not closed with '/>'");
                 }
+            } else if (c == '/') {
+                /* this is the state to return to when the new state is popped */
+                rum_parser_set_state(*headp, RUM_CONTENT);
+                if (start_element(headp, RUM_OPENTAG_EMPTY, language, buffer) < 0) {
+                    return rum_parser_error(*headp, rum_last_error());
+                }
+                element = (*headp)->element;
             } else {
                 return rum_parser_error(*headp, "Invalid character in tag name");
             }

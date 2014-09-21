@@ -18,19 +18,14 @@ struct rum_attr_s {
 
     /* whether this attribute is required to be present in its tag (boolean)
      *
-     * @TODO in the interest of time, this functionality is not implemented; this value is set but ignored
+     * @TODO in the interest of time, this functionality is not implemented;
+     * this value is set but ignored, so all attributes are treated as optional
      */
     int is_required;
 };
 
 /* language definition of an XML tag: <tag [attrs] /> if empty, <tag [attrs]> ... </tag> otherwise */
 struct rum_tag_s {
-    /* this tag's place in the language's tag tree;
-     * parent is NULL if this is the root tag, otherwise this tag is only valid within parent */
-    rum_tag_t *parent;
-    rum_tag_t *next_sibling;
-    rum_tag_t *first_child;
-
     /* the tag itself */
     const char *name;
 
@@ -38,14 +33,18 @@ struct rum_tag_s {
     int is_empty;
 
     /* list of attributes accepted by this tag */
-    int nattrs; /* pedantic: should be size_t ... */
+    int nattrs;
     rum_attr_t *attrs;
+
+    /* this tag's place in the language's tag tree;
+     * parent is NULL if this is the root tag, otherwise this tag is only valid within parent */
+    rum_tag_t *parent;
+    rum_tag_t *next_sibling;
+    rum_tag_t *first_child;
 
     /* a method to display elements of this tag type */
     rum_tag_display_method_t display;
 };
-
-/* a language definition is simply a pointer to the root tag */
 
 /* constructor */
 rum_tag_t *rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs,

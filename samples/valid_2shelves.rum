@@ -5,7 +5,8 @@
       <bottle type="merlot" vintage="2013">Frey Vineyards Organic</bottle>
       <glass type="tumbler" />
       <glass type="tumbler" />
-      <glass type="snifter" />
+      <glass type="snifter"/>
+      <glass/>
    </shelf>
    <shelf id="top">
       <bottle type="Scotch whisky" aged="15">Glenfiddich<!-- almost empty --></bottle>

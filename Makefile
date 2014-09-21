@@ -1,6 +1,3 @@
-#
-# A "real" project would use GNU autotools rather than a simple Makefile.
-#
 LDFLAGS=-L.
 CFLAGS=-I. -Wall
 
@@ -12,6 +9,8 @@ LIBRARY=librump.a
 # application
 CMD=rum
 OBJS=rum.o
+
+SAMPLES=$(shell ls -1 ./samples)
 
 all: $(CMD) $(LIBRARY)
 
@@ -29,6 +28,11 @@ $(CMD): $(OBJS) $(LIBRARY)
 
 $(LIBRARY): $(LIBOBJS)
 	ar $(ARFLAGS) $@ $^
+
+tests: $(CMD) $(SAMPLES)
+
+$(SAMPLES): $(CMD)
+	@(echo; echo "---- $@ ----"; ./$(CMD) ./samples/$@ 2>&1; echo "---"; echo Press q to continue) | less
 
 %.o: %.c $(HEADERS)
 	$(CC) $(CFLAGS) $(LDFLAGS) $(CPPFLAGS) -c -o $@ $<

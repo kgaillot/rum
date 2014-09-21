@@ -9,6 +9,7 @@
 #ifndef RUM_PRIVATE__H
 #define RUM_PRIVATE__H
 
+/* set the library's global last error message */
 void rum_set_error(char *errmsg);
 
 #endif /* RUM_PRIVATE__H */
