@@ -23,7 +23,7 @@ The library
 The RuM parser library, librump.a, consists of these parts:
 
 * rum_types.h: typedef's for language and document objects. Putting them
-in a separate header allows two different objects to reference each other.
+in a separate header allows two different structures to reference each other.
 
 * rum_buffer.c and rum_buffer.h: This is a support object for the use of
 the parser but is exposed to users (all one of them) in case they want
@@ -32,13 +32,18 @@ resized as characters are added to it. The buffer can track a substring
 of itself based on start and end positions, allowing the calling code
 to "bookmark" a section of the buffer.
 
+* rum_parser.c and rum_parser.h: This is another support object,
+and defines a stack type for the parser state engine. It is exposed
+so that users of the library can write custom parse routines for
+other than file input if desired.
+
 * rum_language.c and rum_language.h: This portion of the library allows
 calling code to define a RuM-conformant language. The caller can specify
 each tag, including what attributes the tag takes and which other tags
 may contain it. This is basically a low-rent replacement for DTDs.
 
 The main language object is the tag specification. Tags are stored
-in a tree strucutre, so a language is simply a pointer to the root tag.
+in a tree structure, so a language is simply a pointer to the root tag.
 
 Tags have a function-pointer-based display method, intended for
 the calling code to specify how each tag type should be displayed.
@@ -56,26 +61,21 @@ The document object handles replacement of predefined entities
 (&amp; etc.).
 
 The document object's display function iterates through the
-element tree, calling the appropriate display method for each.
+element tree, calling the appropriate tag display method for each.
 
-* rump.h: overall include file for library, that includes
-the other includes
+* rum_private.h: This contains declarations for unexposed
+support functions.
 
-* rump.c and rump_private.h: the parser engine itself. This part
-is still under active development and may change substantially.
-This contains the file parser function, which is basically a
-giant state engine. It processes one character at a time.
+* rump.h: This is the overall include file for library, and includes
+the other public includes.
 
-Though not a full validating parser, the parser does do some language validation:
+* rump.c: This contains high-level functions, most importantly
+the file parser.
+
+Though not a full validating parser, it does do some language validation:
 - It knows the root tag, and requires it as the outermost tag.
 - It knows and enforces which tags may contain which other tags.
 - It knows and enforces which attributes are valid for which tags.
-
-As of this writing, the parser can handle everything except nested tags
-(whitespace, comments, processing instructions, and the root tag,
-with attributes and content, and correctly handling errors).
-Much of the infrastructure is in place for nested tags, so it should
-be finished soon.
 
 
 The application
@@ -98,8 +98,7 @@ Since this is a demonstration project, some corners were cut:
 * Memory management is minimal. There are lots of small mallocs and frees,
 and some duplication that could be eliminated.
 
-* Error handling and reporting is minimal. If this were a "real" project,
-I'd add an errno/errmsg mechanism and do better reporting with it.
+* Error handling and reporting is basic.
 
 * The tree structure for language specification is inefficient when a tag may
 be included by more than one other tag, but it is sufficient for this project.

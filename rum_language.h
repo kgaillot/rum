@@ -60,13 +60,13 @@ int rum_tag_get_is_empty(const rum_tag_t *tag);
 int rum_tag_get_nattrs(const rum_tag_t *tag);
 const char *rum_tag_get_attr_name(const rum_tag_t *tag, int index);
 
-/* return language tag corresponding to tag_name, or NULL if tag_name is invalid */
-const rum_tag_t *rum_tag_get(const rum_tag_t *root, const char *tag_name);
+/* return tag corresponding to tag_name, or NULL if the requested tag is not among root's children */
+const rum_tag_t *rum_tag_get_child(const rum_tag_t *root, const char *tag_name);
 
 /* print language in human-readable form */
 void rum_display_language(const rum_tag_t *root);
 
 /* call display method on an element */
-int rum_tag_display_element(const rum_tag_t *tag, const rum_element_t *element);
+void rum_tag_display_element(const rum_tag_t *tag, const rum_element_t *element);
 
 #endif /* RUM_LANGUAGE__H */

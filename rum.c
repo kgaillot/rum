@@ -1,7 +1,7 @@
 /*
     rum.c
 
-    application to parse and display rudimentary markup 
+    application to parse and display Rudimentary Markup content
 
     Copyright (c)2014 Ken Gaillot <kg@boogieonline.com>
 */
@@ -11,24 +11,23 @@
 
 #define DEBUG 0
 
-static int
+static void
 display_cabinet(const rum_element_t *cabinet)
 {
     if (rum_element_get_first_child(cabinet)) {
-        printf("The cabinet contains:\n");
+        printf("The cabinet has the following:\n");
     } else {
         printf("The cabinet is empty.\n");
     }
-    return 0;
 }
 
-static int
+static void
 display_shelf(const rum_element_t *shelf)
 {
     const char *id = rum_element_get_value(shelf, "id");
 
     printf("   The");
-    if (id) {
+    if (id && *id) {
         printf(" %s", id);
     }
     if (rum_element_get_first_child(shelf)) {
@@ -36,10 +35,9 @@ display_shelf(const rum_element_t *shelf)
     } else {
         printf(" shelf is empty.\n");
     }
-    return 0;
 }
 
-static int
+static void
 display_bottle(const rum_element_t *bottle)
 {
     const char *bottle_type = rum_element_get_value(bottle, "type");
@@ -48,32 +46,30 @@ display_bottle(const rum_element_t *bottle)
     const char *maker = rum_element_get_content(bottle);
 
     printf("      A");
-    if (vintage) {
+    if (vintage && *vintage) {
         printf(" %s", vintage);
     }
-    if (aged) {
-        printf(" %s-year-old", vintage);
+    if (aged && *aged) {
+        printf(" %s-year-old", aged);
     }
     printf(" bottle");
-    if (maker || bottle_type) {
+    if ((maker && *maker) || (bottle_type && *bottle_type)) {
         printf(" of");
     }
-    if (maker) {
+    if (maker && *maker) {
         printf(" %s", maker);
     }
-    if (bottle_type) {
+    if (bottle_type && *bottle_type) {
         printf(" %s", bottle_type);
     }
     printf("\n");
-    return 0;
 }
 
-static int
+static void
 display_glass(const rum_element_t *glass)
 {
     const char *glass_type = rum_element_get_value(glass, "type");
-    printf("      A %s\n", glass_type? glass_type : "glass");
-    return 0;
+    printf("      A %s\n", (glass_type && *glass_type)? glass_type : "glass");
 }
 
 static rum_tag_t *
@@ -119,7 +115,7 @@ main(int argc, char **argv)
 
     /* define the sample language */
     if ((language = define_language()) == NULL) {
-        fprintf(stderr, "Internal error: could not define sample language\n");
+        fprintf(stderr, "*** ERROR: %s\n", rum_last_error());
         if (infile != stdin) {
             fclose(infile);
         }
@@ -130,7 +126,9 @@ main(int argc, char **argv)
     }
 
     /* parse file */
-    if ((document = rum_parse_file(infile, language)) == NULL) {
+    document = rum_parse_file(infile, language, 1);
+    if (rum_last_error()) {
+        fprintf(stderr, "*** ERROR: %s\n", rum_last_error());
         if (infile != stdin) {
             fclose(infile);
         }
@@ -138,12 +136,7 @@ main(int argc, char **argv)
     }
 
     /* display the document in all its exalted glory */
-    if (rum_element_display(document) < 0) {
-        if (infile != stdin) {
-            fclose(infile);
-        }
-        return 1;
-    }
+    rum_element_display(document);
 
     /* wrap it up */
     if (infile != stdin) {

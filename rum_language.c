@@ -1,7 +1,7 @@
 /*
     rum_language.c
 
-    language definition functions for library to parse Rudimentary Markup 
+    language definition functions for RuM parser library
 
     Copyright (c)2014 Ken Gaillot <kg@boogieonline.com>
 */
@@ -10,6 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <rump.h>
+#include "rum_private.h"
 
 rum_tag_t *
 rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_attr_t *attrs,
@@ -17,13 +18,17 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
 {
     rum_tag_t *tag;
 
+    rum_set_error(NULL);
+
     /* can't add a child tag to an empty tag */
     if (parent && parent->is_empty) {
+        rum_set_error("Programmer error: Empty tag may not contain nested tags");
         return NULL;
     }
 
     /* create a tag instance */
     if ((tag = malloc(sizeof(rum_tag_t))) == NULL) {
+        rum_set_error("Unable to allocate memory for new tag specification");
         return NULL;
     }
     tag->name = name;
@@ -36,6 +41,7 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
     if (nattrs && attrs) {
         if ((tag->attrs = malloc(sizeof(rum_attr_t) * nattrs)) == NULL) {
             free(tag);
+            rum_set_error("Unable to allocate memory for new tag specification");
             return NULL;
         }
         memcpy(tag->attrs, attrs, sizeof(rum_attr_t) * nattrs);
@@ -60,62 +66,94 @@ rum_tag_new(rum_tag_t *parent, const char *name, int is_empty, int nattrs, rum_a
 rum_tag_t *
 rum_tag_get_parent(const rum_tag_t *tag)
 {
-    return tag? tag->parent : NULL;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get parent of nonexistent tag specification");
+        return NULL;
+    }
+    return tag->parent;
 }
 
 rum_tag_t *
 rum_tag_get_next_sibling(const rum_tag_t *tag)
 {
-    return tag? tag->next_sibling : NULL;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get sibling of nonexistent tag specification");
+        return NULL;
+    }
+    return tag->next_sibling;
 }
 
 rum_tag_t *
 rum_tag_get_first_child(const rum_tag_t *tag)
 {
-    return tag? tag->first_child : NULL;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get child of nonexistent tag specification");
+        return NULL;
+    }
+    return tag->first_child;
 }
 
 const char *
 rum_tag_get_name(const rum_tag_t *tag)
 {
-    return tag? tag->name : NULL;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get name of nonexistent tag");
+        return NULL;
+    }
+    return tag->name;
 }
 
 int
 rum_tag_get_is_empty(const rum_tag_t *tag)
 {
-    /* no good default if tag is NULL, just pick one */
-    return tag? tag->is_empty : 0;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get settings of nonexistent tag");
+        return 0;
+    }
+    return tag->is_empty;
 }
 
 int
 rum_tag_get_nattrs(const rum_tag_t *tag)
 {
-    return tag? tag->nattrs : 0;
+    rum_set_error(NULL);
+    if (tag == NULL) {
+        rum_set_error("Programmer error: Unable to get settings of nonexistent tag");
+        return 0;
+    }
+    return tag->nattrs;
 }
 
 const char *
 rum_tag_get_attr_name(const rum_tag_t *tag, int index)
 {
-        return tag && (index < tag->nattrs)? tag->attrs[index].name : NULL;
+    rum_set_error(NULL);
+    if ((tag == NULL) || (index >= tag->nattrs)) {
+        rum_set_error("Programmer error: Unable to get nonexistent attribute name for tag");
+        return NULL;
+    }
+    return tag->attrs[index].name;
 }
 
 const rum_tag_t *
-rum_tag_get(const rum_tag_t *root, const char *tag_name)
+rum_tag_get_child(const rum_tag_t *root, const char *tag_name)
 {
     const rum_tag_t *tag;
 
-    if ((root == NULL) || !strcmp(root->name, tag_name)) {
-        return root;
+    rum_set_error(NULL);
+    if (root && tag_name) {
+        for (tag = root->first_child; tag; tag = tag->next_sibling) {
+            if (!strcmp(tag->name, tag_name)) {
+                return tag;
+            }
+        }
     }
-    if ((root->first_child != NULL)
-    && ((tag = rum_tag_get(root->first_child, tag_name)) != NULL)) {
-        return tag;
-    }
-    if ((root->next_sibling != NULL)
-    && ((tag = rum_tag_get(root->next_sibling, tag_name)) != NULL)) {
-        return tag;
-    }
+    rum_set_error("Unknown tag");
     return NULL;
 }
 
@@ -125,6 +163,7 @@ rum_display_language_subtree(const rum_tag_t *root, int indent_level)
     const rum_tag_t *tag = root;
     int i;
 
+    rum_set_error(NULL);
     while (tag != NULL) {
         printf("%*sTAG %s (%s)\n", (indent_level * 3), " ", tag->name,
             (tag->is_empty? "empty": "nonempty"));
@@ -143,6 +182,7 @@ rum_display_language_subtree(const rum_tag_t *root, int indent_level)
 void
 rum_display_language(const rum_tag_t *root)
 {
+    rum_set_error(NULL);
     if (root == NULL) {
         printf("The language is undefined.\n\n");
     } else {
@@ -151,8 +191,9 @@ rum_display_language(const rum_tag_t *root)
     }
 }
 
-int
+void
 rum_tag_display_element(const rum_tag_t *tag, const rum_element_t *element)
 {
-    return(tag->display(element));
+    rum_set_error(NULL);
+    tag->display(element);
 }

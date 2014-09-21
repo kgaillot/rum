@@ -4,7 +4,7 @@
 <cabinet>
    <shelf	id="only"   >   
       <bottle type="Scotch whisky" aged="8">Glenfiddich</bottle>
-      <bottle type="Scotch whisky" aged="10">Laphroaig</bottle>
+      <bottle aged="10" type="Scotch whisky">Laphroaig</bottle>
       <glass type="tumbler" />
       <!-- <glass type="martini glass" /> fell and broke -->
    </shelf>

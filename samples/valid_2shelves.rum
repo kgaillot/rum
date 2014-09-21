@@ -8,6 +8,6 @@
       <glass type="snifter" />
    </shelf>
    <shelf id="top">
-      <bottle type="Scotch whisky" aged="15">Glenfiddich <!-- almost empty --></bottle>
+      <bottle type="Scotch whisky" aged="15">Glenfiddich<!-- almost empty --></bottle>
    </shelf>
 </cabinet>

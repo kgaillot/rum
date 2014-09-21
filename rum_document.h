@@ -13,10 +13,6 @@
 
 /* XML element: a tag instance and its associated attribute values and content */
 struct rum_element_s {
-    /* this tag's place in the document's tag tree */
-    rum_element_t *next_sibling;
-    rum_element_t *first_child;
-
     /* tag that this element is an instance of */
     const rum_tag_t *tag;
 
@@ -33,6 +29,11 @@ struct rum_element_s {
 
     /* this element's content (NULL for empty tags) */
     char *content;
+
+    /* this tag's place in the document's tag tree */
+    rum_element_t *parent;
+    rum_element_t *next_sibling;
+    rum_element_t *first_child;
 };
 
 /* a document is simply a pointer to the root element */
@@ -41,12 +42,13 @@ struct rum_element_s {
 rum_element_t *rum_element_new(rum_element_t *parent, const rum_tag_t *language, const char *tag_name);
 
 /* accessors */
-rum_element_t *rum_element_get_next_sibling(const rum_element_t *tag);
-rum_element_t *rum_element_get_first_child(const rum_element_t *tag);
 const char *rum_element_get_name(const rum_element_t *element);
 int rum_element_get_is_empty(const rum_element_t *element);
 const char *rum_element_get_content(const rum_element_t *element);
 const char *rum_element_get_value(const rum_element_t *element, const char *attr_name);
+rum_element_t *rum_element_get_parent(const rum_element_t *element);
+rum_element_t *rum_element_get_next_sibling(const rum_element_t *element);
+rum_element_t *rum_element_get_first_child(const rum_element_t *element);
 
 /* add a value to an attribute of the element */
 int rum_element_set_value(rum_element_t *element, const char *attr_name, const char *attr_value);
@@ -59,6 +61,6 @@ int rum_element_set_content(rum_element_t *element, const char *content);
  * each element's display method is called in sequence, starting with this element itself,
  * then all its children, then all its siblings (each displayed in the same manner)
  */
-int rum_element_display(const rum_element_t *element);
+void rum_element_display(const rum_element_t *element);
 
 #endif /* RUM_DOCUMENT__H */

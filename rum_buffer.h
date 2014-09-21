@@ -1,7 +1,7 @@
 /*
     rum_buffer.h
 
-    buffer handling for library to parse Rudimentary Markup
+    buffer handling for RuM parser library
 
     Copyright (c)2014 Ken Gaillot <kg@boogieonline.com>
 */
@@ -10,18 +10,19 @@
 #define RUM_BUFFER__H
 
 #include <stddef.h>
+#include <rum_types.h>
 
 /* buffers will be allocated in chunks of this many bytes */
 #define CHUNKSIZE (1024)
 
 /* dynamically sized character buffer, with a current position and a current substring */
-typedef struct rum_buffer_s {
+struct rum_buffer_s {
     char *buf;
     int nchunks;
     size_t pos;
     size_t substr_start;
     size_t substr_end;
-} rum_buffer_t;
+};
 
 /* constructor */
 rum_buffer_t *rum_buffer_new();
